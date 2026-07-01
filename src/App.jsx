@@ -84,6 +84,13 @@ const LEVELS_INFO = {
   C1: "CAE/C1 Advanced level — sophisticated language, abstract topics, precision and nuance",
 };
 
+const TIMER_SECONDS = {
+  "A2+": 45,
+  B1: 60,
+  "B2+": 90,
+  C1: 120,
+};
+
 const COLORS = {
   "A2+": { bg: "#e8f5e9", accent: "#2e7d32", light: "#c8e6c9", dark: "#1b5e20" },
   B1: { bg: "#e3f2fd", accent: "#1565c0", light: "#bbdefb", dark: "#0d47a1" },
@@ -113,11 +120,11 @@ function getSessions() {
 // ─────────────────────────────────────────────
 // API call
 // ─────────────────────────────────────────────
-async function callClaude(messages, system) {
+async function callClaude(messages, system, isFeedback = false) {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, system }),
+    body: JSON.stringify({ messages, system, isFeedback }),
   });
   const data = await res.json();
   return data.content?.[0]?.text || "Connection error — please try again.";
@@ -141,6 +148,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
   const [interim, setInterim] = useState("");
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [lastDuration, setLastDuration] = useState(null);
+  const timerRef = useRef(null);
   const recognitionRef = useRef(null);
   const [teacherPwd, setTeacherPwd] = useState("");
   const [teacherError, setTeacherError] = useState(false);
@@ -216,6 +226,7 @@ Adapt your vocabulary and complexity to ${level} level. Be professional but warm
 Student: ${name}, Level: ${level}
 Task: ${task.title}
 Sounds the student finds difficult: ${sounds}
+Approximate speaking time: ${lastDuration ? lastDuration + " seconds (target: " + TIMER_SECONDS[level] + "s)" : "not measured"}
 ${CHILE_PHONETICS}
 
 Here is the full conversation from the task:
@@ -227,6 +238,9 @@ Give structured feedback using exactly these sections with emojis as headers:
 
 ✅ **Strengths**
 Name 2 specific things the student did well — refer to actual things they said.
+
+⏱️ **Response Length**
+Comment on whether their speaking time was appropriate for ${level} level (target: ${TIMER_SECONDS[level]} seconds). If too short, encourage expansion. If too long, note what could be more concise. Be specific.
 
 📝 **Grammar & Vocabulary**
 Give 1-2 specific points to improve. Quote a phrase they used, then show the corrected or improved version. Keep it concrete.
@@ -280,7 +294,8 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
       const fbSystem = getFeedbackSystem();
       const reply = await callClaude(
         [{ role: "user", content: "Please give me feedback on my performance." }],
-        fbSystem
+        fbSystem,
+        true
       );
       setFeedbackMessages([{ role: "assistant", content: reply }]);
     } catch {
@@ -351,7 +366,7 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
       setInterim(interimText);
     };
     recognition.onerror = (e) => {
-      if (e.error !== "aborted") setRecording(false);
+      if (e.error !== "aborted") { stopRecording(); }
       setInterim("");
     };
     recognition.onend = () => {
@@ -362,12 +377,33 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
     recognitionRef.current = recognition;
     recognition.start();
     setRecording(true);
+
+    // Start countdown timer
+    const total = TIMER_SECONDS[level] || 60;
+    setTimeLeft(total);
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setLastDuration(total);
+          recognitionRef.current?.stop();
+          setRecording(false);
+          setInterim("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   }
 
   function stopRecording() {
+    clearInterval(timerRef.current);
+    const total = TIMER_SECONDS[level] || 60;
+    setLastDuration(total - (timeLeft || 0));
     recognitionRef.current?.stop();
     setRecording(false);
     setInterim("");
+    setTimeLeft(null);
   }
 
   // ── STYLES ────────────────────────────────
@@ -687,8 +723,35 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
               </button>
 
               {recording && (
-                <div style={{ fontSize: "13px", color: "#d32f2f", marginBottom: "8px", textAlign: "center" }}>
-                  🔴 Recording… speak now, then press Stop
+                <div style={{ marginBottom: "10px" }}>
+                  {/* Timer circle */}
+                  <div style={{ textAlign: "center", marginBottom: "6px" }}>
+                    <span style={{
+                      display: "inline-block",
+                      width: "64px",
+                      height: "64px",
+                      lineHeight: "64px",
+                      borderRadius: "50%",
+                      fontSize: "22px",
+                      fontWeight: "bold",
+                      background: timeLeft > (TIMER_SECONDS[level] * 0.5)
+                        ? "#e8f5e9"
+                        : timeLeft > (TIMER_SECONDS[level] * 0.2)
+                        ? "#fff9c4"
+                        : "#ffebee",
+                      color: timeLeft > (TIMER_SECONDS[level] * 0.5)
+                        ? "#2e7d32"
+                        : timeLeft > (TIMER_SECONDS[level] * 0.2)
+                        ? "#f57f17"
+                        : "#c62828",
+                      border: "3px solid currentColor",
+                    }}>
+                      {timeLeft}s
+                    </span>
+                  </div>
+                  <div style={{ textAlign: "center", fontSize: "12px", color: "#888" }}>
+                    🎯 Target: {TIMER_SECONDS[level]}s · 🔴 Speak clearly
+                  </div>
                 </div>
               )}
               {interim && (
