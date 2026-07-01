@@ -186,6 +186,7 @@ export default function App() {
   const [lastDuration, setLastDuration] = useState(null);
   const timerRef = useRef(null);
   const recognitionRef = useRef(null);
+  const finalTranscriptRef = useRef("");
   const [teacherPwd, setTeacherPwd] = useState("");
   const [teacherError, setTeacherError] = useState(false);
   const [sessions, setSessions] = useState([]);
@@ -387,16 +388,15 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (e) => {
-      let finalText = "";
       let interimText = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) {
-          finalText += e.results[i][0].transcript + " ";
+          finalTranscriptRef.current += e.results[i][0].transcript + " ";
         } else {
           interimText += e.results[i][0].transcript;
         }
       }
-      if (finalText) setInput((prev) => (prev ? prev + " " + finalText.trim() : finalText.trim()));
+      setInput(finalTranscriptRef.current.trim());
       setInterim(interimText);
     };
     recognition.onerror = (e) => {
@@ -408,6 +408,7 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
       setInterim("");
     };
 
+    finalTranscriptRef.current = "";
     recognitionRef.current = recognition;
     recognition.start();
     setRecording(true);
