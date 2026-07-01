@@ -187,6 +187,7 @@ export default function App() {
   const timerRef = useRef(null);
   const recognitionRef = useRef(null);
   const finalTranscriptRef = useRef("");
+  const interimRef = useRef("");
   const isRecordingRef = useRef(false);
   const [teacherPwd, setTeacherPwd] = useState("");
   const [teacherError, setTeacherError] = useState(false);
@@ -379,76 +380,88 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
   function startRecording() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      alert("Speech recognition is not supported. Please use Chrome (Android) or Safari (iOS).");
+      alert("Speech recognition not supported. Use Chrome (Android) or Safari (iOS).");
       return;
     }
 
-    finalTranscriptRef.current = "";
+    // Sync ref with whatever the student has typed/edited so far
+    finalTranscriptRef.current = input;
     isRecordingRef.current = true;
     setRecording(true);
 
-    function makeAndStart() {
-      const r = new SR();
-      r.lang = "en-US";
-      r.continuous = false;
-      r.interimResults = true;
-      r.maxAlternatives = 1;
+    const r = new SR();
+    r.lang = "en-US";
+    r.continuous = false;
+    r.interimResults = false;
+    r.maxAlternatives = 1;
 
-      r.onresult = (e) => {
-        let interim = "";
-        for (let i = 0; i < e.results.length; i++) {
-          if (e.results[i].isFinal) {
-            finalTranscriptRef.current += e.results[i][0].transcript + " ";
-          } else {
-            interim += e.results[i][0].transcript;
+    r.interimResults = true;
+
+    r.onresult = (e) => {
+      let interim = "";
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalTranscriptRef.current += e.results[i][0].transcript + " ";
+          interimRef.current = "";
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      interimRef.current = interim;
+      setInput((finalTranscriptRef.current + interim).trim());
+    };
+
+    r.onerror = () => {
+      isRecordingRef.current = false;
+      setRecording(false);
+    };
+
+    r.onend = () => {
+      isRecordingRef.current = false;
+      setRecording(false);
+    };
+
+    recognitionRef.current = r;
+    try { r.start(); } catch {}
+
+    // Start timer only on first press
+    if (timeLeft === null) {
+      const total = TIMER_SECONDS[level] || 60;
+      setTimeLeft(total);
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            setLastDuration(total);
+            try { recognitionRef.current?.stop(); } catch {}
+            setRecording(false);
+            return 0;
           }
-        }
-        setInput(finalTranscriptRef.current.trim());
-        setInterim(interim);
-      };
-
-      r.onerror = () => { setInterim(""); };
-
-      r.onend = () => {
-        setInterim("");
-        if (isRecordingRef.current) {
-          try { makeAndStart(); } catch {}
-        }
-      };
-
-      recognitionRef.current = r;
-      try { r.start(); } catch {}
+          return prev - 1;
+        });
+      }, 1000);
     }
-
-    makeAndStart();
-
-    const total = TIMER_SECONDS[level] || 60;
-    setTimeLeft(total);
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          setLastDuration(total);
-          isRecordingRef.current = false;
-          try { recognitionRef.current?.stop(); } catch {}
-          setRecording(false);
-          setInterim("");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   }
 
   function stopRecording() {
     isRecordingRef.current = false;
+    // Capture any interim text before stopping
+    if (interimRef.current) {
+      finalTranscriptRef.current = (finalTranscriptRef.current + " " + interimRef.current).trim();
+      interimRef.current = "";
+      setInput(finalTranscriptRef.current);
+    }
+    try { recognitionRef.current?.abort(); } catch {}
+    setRecording(false);
+  }
+
+  function resetAndSend() {
     clearInterval(timerRef.current);
     const total = TIMER_SECONDS[level] || 60;
     setLastDuration(total - (timeLeft || 0));
-    try { recognitionRef.current?.stop(); } catch {}
-    setRecording(false);
-    setInterim("");
     setTimeLeft(null);
+    sendMessage();
+    finalTranscriptRef.current = "";
   }
 
     // ── STYLES ────────────────────────────────
@@ -777,94 +790,81 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
           {/* Input or Get Feedback */}
           {phase === "speaking" && (
             <div style={{ marginTop: "10px" }}>
+
+              {/* Timer — shows once started */}
+              {timeLeft !== null && (
+                <div style={{ textAlign: "center", marginBottom: "8px" }}>
+                  <span style={{
+                    display: "inline-block",
+                    width: "58px", height: "58px", lineHeight: "58px",
+                    borderRadius: "50%", fontSize: "20px", fontWeight: "bold",
+                    background: timeLeft > (TIMER_SECONDS[level] * 0.5) ? "#e8f5e9"
+                      : timeLeft > (TIMER_SECONDS[level] * 0.2) ? "#fff9c4" : "#ffebee",
+                    color: timeLeft > (TIMER_SECONDS[level] * 0.5) ? "#2e7d32"
+                      : timeLeft > (TIMER_SECONDS[level] * 0.2) ? "#f57f17" : "#c62828",
+                    border: "3px solid currentColor",
+                  }}>
+                    {timeLeft}s
+                  </span>
+                  <div style={{ fontSize: "11px", color: "#aaa", marginTop: "4px" }}>
+                    Target: {TIMER_SECONDS[level]}s
+                  </div>
+                </div>
+              )}
+
               {/* Mic button */}
               <button
                 style={{
-                  width: "100%",
-                  padding: "16px",
-                  borderRadius: "12px",
+                  width: "100%", padding: "16px", borderRadius: "12px",
                   border: "none",
                   background: recording ? "#d32f2f" : colors.accent,
-                  color: "#fff",
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  marginBottom: "8px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
+                  color: "#fff", fontSize: "16px", fontWeight: "bold",
+                  cursor: "pointer", marginBottom: "8px",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                 }}
                 onClick={recording ? stopRecording : startRecording}
                 disabled={loading}
               >
-                {recording ? "⏹ Stop Recording" : "🎙️ Hold to Speak"}
+                {recording ? "⏹ Listening… tap to stop" : "🎙️ Tap to speak"}
               </button>
 
               {recording && (
-                <div style={{ marginBottom: "10px" }}>
-                  {/* Timer circle */}
-                  <div style={{ textAlign: "center", marginBottom: "6px" }}>
-                    <span style={{
-                      display: "inline-block",
-                      width: "64px",
-                      height: "64px",
-                      lineHeight: "64px",
-                      borderRadius: "50%",
-                      fontSize: "22px",
-                      fontWeight: "bold",
-                      background: timeLeft > (TIMER_SECONDS[level] * 0.5)
-                        ? "#e8f5e9"
-                        : timeLeft > (TIMER_SECONDS[level] * 0.2)
-                        ? "#fff9c4"
-                        : "#ffebee",
-                      color: timeLeft > (TIMER_SECONDS[level] * 0.5)
-                        ? "#2e7d32"
-                        : timeLeft > (TIMER_SECONDS[level] * 0.2)
-                        ? "#f57f17"
-                        : "#c62828",
-                      border: "3px solid currentColor",
-                    }}>
-                      {timeLeft}s
-                    </span>
-                  </div>
-                  <div style={{ textAlign: "center", fontSize: "12px", color: "#888" }}>
-                    🎯 Target: {TIMER_SECONDS[level]}s · 🔴 Speak clearly
-                  </div>
-                </div>
-              )}
-              {interim && (
-                <div style={{ background: "#fff9c4", borderRadius: "8px", padding: "8px 12px", fontSize: "14px", color: "#555", marginBottom: "6px", fontStyle: "italic" }}>
-                  {interim}
+                <div style={{ textAlign: "center", fontSize: "12px", color: "#d32f2f", marginBottom: "8px" }}>
+                  🔴 Speak now — tap Stop when done
                 </div>
               )}
 
-              {/* Transcript review area */}
+              {/* Accumulated transcript */}
               {input.length > 0 && (
                 <>
                   <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>
-                    ✏️ Review your transcription (edit if needed):
+                    ✏️ Transcription (edit if needed, or tap mic again to add more):
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <textarea
-                      style={{ ...s.textInput, flex: 1, height: "60px", marginBottom: 0, resize: "none" }}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                    />
-                    <button
-                      style={{ ...s.btn, width: "auto", padding: "0 16px", marginTop: 0, fontSize: "20px" }}
-                      onClick={sendMessage}
-                      disabled={loading}
-                    >
-                      ➤
-                    </button>
-                  </div>
+                  <textarea
+                    style={{ ...s.textInput, height: "70px", marginBottom: "8px", resize: "none" }}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                  />
+                  <button
+                    style={s.btn}
+                    onClick={() => {
+                      clearInterval(timerRef.current);
+                      const total = TIMER_SECONDS[level] || 60;
+                      setLastDuration(total - (timeLeft || 0));
+                      setTimeLeft(null);
+                      finalTranscriptRef.current = "";
+                      sendMessage();
+                    }}
+                    disabled={loading || recording}
+                  >
+                    Send ➤
+                  </button>
                 </>
               )}
             </div>
           )}
 
-          {phase === "ready" && (
+                    {phase === "ready" && (
             <button style={s.btn} onClick={getFeedback}>
               Get Feedback 📝
             </button>
