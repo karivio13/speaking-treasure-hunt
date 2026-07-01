@@ -1112,8 +1112,7 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
             </div>
             <div class="feedback-section">
               <h4>💬 Feedback Given</h4>
-              <div class="feedback">${(t.feedback || "").replace(/
-/g, "<br>")}</div>
+              <div class="feedback">${(t.feedback || "").split("\n").join("<br>")}</div>
             </div>
           </div>
         `).join("")}
@@ -1185,7 +1184,7 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `speaking-session-report-${date.replace(/\//g, "-")}.html`;
+    a.download = `speaking-session-report-${date.split("/").join("-")}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
