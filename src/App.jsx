@@ -384,47 +384,55 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
       return;
     }
 
-    // Sync ref with whatever the student has typed/edited so far
+    // Preserve any text the student has already typed/recorded
     finalTranscriptRef.current = input;
+    interimRef.current = "";
     isRecordingRef.current = true;
     setRecording(true);
 
-    const r = new SR();
-    r.lang = "en-US";
-    r.continuous = false;
-    r.interimResults = false;
-    r.maxAlternatives = 1;
+    function startSession() {
+      if (!isRecordingRef.current) return;
+      const r = new SR();
+      r.lang = "en-US";
+      r.continuous = false;      // Android-safe: one utterance at a time
+      r.interimResults = false;  // No interim = no duplicates
+      r.maxAlternatives = 1;
 
-    r.interimResults = true;
-
-    r.onresult = (e) => {
-      let interim = "";
-      for (let i = 0; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          finalTranscriptRef.current += e.results[i][0].transcript + " ";
-          interimRef.current = "";
-        } else {
-          interim += e.results[i][0].transcript;
+      r.onresult = (e) => {
+        for (let i = 0; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            const word = e.results[i][0].transcript.trim();
+            if (word) {
+              finalTranscriptRef.current = finalTranscriptRef.current
+                ? finalTranscriptRef.current + " " + word
+                : word;
+            }
+          }
         }
-      }
-      interimRef.current = interim;
-      setInput((finalTranscriptRef.current + interim).trim());
-    };
+        setInput(finalTranscriptRef.current);
+      };
 
-    r.onerror = () => {
-      isRecordingRef.current = false;
-      setRecording(false);
-    };
+      r.onerror = (e) => {
+        // no-speech on Android = silence detected, just restart
+        if (e.error === "no-speech" && isRecordingRef.current) {
+          setTimeout(startSession, 100);
+        }
+      };
 
-    r.onend = () => {
-      isRecordingRef.current = false;
-      setRecording(false);
-    };
+      r.onend = () => {
+        // Auto-restart while student is still recording
+        if (isRecordingRef.current) {
+          setTimeout(startSession, 100);
+        }
+      };
 
-    recognitionRef.current = r;
-    try { r.start(); } catch {}
+      recognitionRef.current = r;
+      try { r.start(); } catch(e) {}
+    }
 
-    // Start timer only on first press
+    startSession();
+
+    // Timer — only start on first press
     if (timeLeft === null) {
       const total = TIMER_SECONDS[level] || 60;
       setTimeLeft(total);
@@ -433,7 +441,8 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
           if (prev <= 1) {
             clearInterval(timerRef.current);
             setLastDuration(total);
-            try { recognitionRef.current?.stop(); } catch {}
+            isRecordingRef.current = false;
+            try { recognitionRef.current?.abort(); } catch(e) {}
             setRecording(false);
             return 0;
           }
@@ -445,23 +454,8 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
 
   function stopRecording() {
     isRecordingRef.current = false;
-    // Capture any interim text before stopping
-    if (interimRef.current) {
-      finalTranscriptRef.current = (finalTranscriptRef.current + " " + interimRef.current).trim();
-      interimRef.current = "";
-      setInput(finalTranscriptRef.current);
-    }
-    try { recognitionRef.current?.abort(); } catch {}
+    try { recognitionRef.current?.abort(); } catch(e) {}
     setRecording(false);
-  }
-
-  function resetAndSend() {
-    clearInterval(timerRef.current);
-    const total = TIMER_SECONDS[level] || 60;
-    setLastDuration(total - (timeLeft || 0));
-    setTimeLeft(null);
-    sendMessage();
-    finalTranscriptRef.current = "";
   }
 
     // ── STYLES ────────────────────────────────
