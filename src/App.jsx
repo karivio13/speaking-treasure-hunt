@@ -140,6 +140,7 @@ export default function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [interim, setInterim] = useState("");
   const recognitionRef = useRef(null);
   const [teacherPwd, setTeacherPwd] = useState("");
   const [teacherError, setTeacherError] = useState(false);
@@ -332,18 +333,30 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
     }
     const recognition = new SR();
     recognition.lang = "en-US";
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
-      setInput((prev) => (prev ? prev + " " + transcript : transcript));
+      let finalText = "";
+      let interimText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalText += e.results[i][0].transcript + " ";
+        } else {
+          interimText += e.results[i][0].transcript;
+        }
+      }
+      if (finalText) setInput((prev) => (prev ? prev + " " + finalText.trim() : finalText.trim()));
+      setInterim(interimText);
     };
-    recognition.onerror = () => {
-      setRecording(false);
+    recognition.onerror = (e) => {
+      if (e.error !== "aborted") setRecording(false);
+      setInterim("");
     };
     recognition.onend = () => {
       setRecording(false);
+      setInterim("");
     };
 
     recognitionRef.current = recognition;
@@ -354,6 +367,7 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
   function stopRecording() {
     recognitionRef.current?.stop();
     setRecording(false);
+    setInterim("");
   }
 
   // ── STYLES ────────────────────────────────
@@ -672,8 +686,13 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
               </button>
 
               {recording && (
-                <div style={{ textAlign: "center", fontSize: "13px", color: "#d32f2f", marginBottom: "8px" }}>
-                  🔴 Recording… speak clearly, then press Stop
+                <div style={{ fontSize: "13px", color: "#d32f2f", marginBottom: "8px", textAlign: "center" }}>
+                  🔴 Recording… speak now, then press Stop
+                </div>
+              )}
+              {interim && (
+                <div style={{ background: "#fff9c4", borderRadius: "8px", padding: "8px 12px", fontSize: "14px", color: "#555", marginBottom: "6px", fontStyle: "italic" }}>
+                  {interim}
                 </div>
               )}
 
