@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { messages, system } = req.body;
+  const { messages, system, isFeedback } = req.body;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 300,
+        max_tokens: isFeedback ? 1024 : 400,
         system,
         messages,
       }),
