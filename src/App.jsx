@@ -187,6 +187,7 @@ export default function App() {
   const timerRef = useRef(null);
   const recognitionRef = useRef(null);
   const finalTranscriptRef = useRef("");
+  const isRecordingRef = useRef(false);
   const [teacherPwd, setTeacherPwd] = useState("");
   const [teacherError, setTeacherError] = useState(false);
   const [sessions, setSessions] = useState([]);
@@ -378,42 +379,49 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
   function startRecording() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome on Android or Safari on iOS.");
+      alert("Speech recognition is not supported. Please use Chrome (Android) or Safari (iOS).");
       return;
     }
-    const recognition = new SR();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (e) => {
-      let interimText = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          finalTranscriptRef.current += e.results[i][0].transcript + " ";
-        } else {
-          interimText += e.results[i][0].transcript;
-        }
-      }
-      setInput(finalTranscriptRef.current.trim());
-      setInterim(interimText);
-    };
-    recognition.onerror = (e) => {
-      if (e.error !== "aborted") { stopRecording(); }
-      setInterim("");
-    };
-    recognition.onend = () => {
-      setRecording(false);
-      setInterim("");
-    };
 
     finalTranscriptRef.current = "";
-    recognitionRef.current = recognition;
-    recognition.start();
+    isRecordingRef.current = true;
     setRecording(true);
 
-    // Start countdown timer
+    function makeAndStart() {
+      const r = new SR();
+      r.lang = "en-US";
+      r.continuous = false;
+      r.interimResults = true;
+      r.maxAlternatives = 1;
+
+      r.onresult = (e) => {
+        let interim = "";
+        for (let i = 0; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalTranscriptRef.current += e.results[i][0].transcript + " ";
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        setInput(finalTranscriptRef.current.trim());
+        setInterim(interim);
+      };
+
+      r.onerror = () => { setInterim(""); };
+
+      r.onend = () => {
+        setInterim("");
+        if (isRecordingRef.current) {
+          try { makeAndStart(); } catch {}
+        }
+      };
+
+      recognitionRef.current = r;
+      try { r.start(); } catch {}
+    }
+
+    makeAndStart();
+
     const total = TIMER_SECONDS[level] || 60;
     setTimeLeft(total);
     timerRef.current = setInterval(() => {
@@ -421,7 +429,8 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
         if (prev <= 1) {
           clearInterval(timerRef.current);
           setLastDuration(total);
-          recognitionRef.current?.stop();
+          isRecordingRef.current = false;
+          try { recognitionRef.current?.stop(); } catch {}
           setRecording(false);
           setInterim("");
           return 0;
@@ -432,16 +441,17 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
   }
 
   function stopRecording() {
+    isRecordingRef.current = false;
     clearInterval(timerRef.current);
     const total = TIMER_SECONDS[level] || 60;
     setLastDuration(total - (timeLeft || 0));
-    recognitionRef.current?.stop();
+    try { recognitionRef.current?.stop(); } catch {}
     setRecording(false);
     setInterim("");
     setTimeLeft(null);
   }
 
-  // ── STYLES ────────────────────────────────
+    // ── STYLES ────────────────────────────────
   const s = {
     app: {
       minHeight: "100vh",
