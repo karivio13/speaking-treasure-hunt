@@ -1063,14 +1063,133 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
           </div>
         ))}
 
-        <button
-          style={{ ...s.btnGhost, maxWidth: "520px", margin: "0 14px" }}
-          onClick={() => { setScreen("setup"); setTeacherPwd(""); }}
-        >
-          ← Exit dashboard
-        </button>
+        <div style={{ display: "flex", gap: "10px", maxWidth: "520px", margin: "0 14px" }}>
+          <button
+            style={{ ...s.btn, background: "#2e7d32", flex: 1, marginTop: 0 }}
+            onClick={downloadReport}
+            disabled={sessions.length === 0}
+          >
+            ⬇️ Download Report
+          </button>
+          <button
+            style={{ ...s.btnGhost, flex: 1, marginTop: 0 }}
+            onClick={() => { setScreen("setup"); setTeacherPwd(""); }}
+          >
+            ← Exit
+          </button>
+        </div>
       </div>
     );
+  }
+
+  function downloadReport() {
+    const date = new Date().toLocaleDateString("es-CL");
+    const time = new Date().toLocaleTimeString("es-CL");
+
+    const sessionHTML = sessions.map((sess, i) => `
+      <div class="session">
+        <div class="session-header">
+          <h2>${i + 1}. ${sess.name}</h2>
+          <div class="meta">
+            <span class="badge">${sess.level}</span>
+            <span class="timestamp">${sess.timestamp}</span>
+          </div>
+          <p class="sounds"><strong>Difficult sounds:</strong> ${sess.difficultSounds || "not specified"}</p>
+        </div>
+        ${(sess.tasks || []).map((t, j) => `
+          <div class="task">
+            <h3>Task ${j + 1}: ${t.title}</h3>
+            <div class="transcript-section">
+              <h4>📝 Transcript</h4>
+              <div class="transcript">
+                ${(t.messages || []).map(m => `
+                  <div class="message ${m.role}">
+                    <strong>${m.role === "user" ? sess.name : "Examiner"}:</strong>
+                    <span>${m.content}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+            <div class="feedback-section">
+              <h4>💬 Feedback Given</h4>
+              <div class="feedback">${(t.feedback || "").replace(/
+/g, "<br>")}</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `).join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Speaking Skills Session Report — ${date}</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 860px; margin: 0 auto; padding: 40px 24px; color: #222; }
+    h1 { color: #1a237e; border-bottom: 3px solid #1a237e; padding-bottom: 12px; }
+    .report-meta { color: #666; font-size: 14px; margin-bottom: 32px; }
+    .session { background: #f8f9fa; border-radius: 12px; padding: 24px; margin-bottom: 32px; border-left: 5px solid #1a237e; }
+    .session-header h2 { margin: 0 0 8px 0; color: #1a237e; }
+    .meta { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+    .badge { background: #1a237e; color: white; border-radius: 20px; padding: 3px 12px; font-size: 13px; font-weight: bold; }
+    .timestamp { color: #888; font-size: 13px; }
+    .sounds { font-size: 13px; color: #555; margin: 4px 0 0 0; }
+    .task { background: white; border-radius: 10px; padding: 18px; margin-top: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .task h3 { color: #333; margin: 0 0 14px 0; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+    h4 { font-size: 13px; color: #666; margin: 12px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+    .transcript { background: #f5f5f5; border-radius: 8px; padding: 14px; }
+    .message { margin-bottom: 10px; font-size: 14px; line-height: 1.5; }
+    .message.user strong { color: #1565c0; }
+    .message.assistant strong { color: #555; }
+    .feedback { background: #e8f5e9; border-radius: 8px; padding: 14px; font-size: 14px; line-height: 1.65; }
+    .summary { background: #e8eaf6; border-radius: 10px; padding: 18px; margin-bottom: 28px; }
+    .summary h2 { margin: 0 0 10px 0; color: #1a237e; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #1a237e; color: white; padding: 10px 14px; text-align: left; }
+    td { padding: 9px 14px; border-bottom: 1px solid #ddd; }
+    tr:nth-child(even) td { background: #f0f0f0; }
+    @media print { body { padding: 20px; } .session { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <h1>🎙️ Speaking Skills Session — Report</h1>
+  <div class="report-meta">
+    <strong>UAH · Facultad de Educación · English as a Foreign Language Teacher Education Programme</strong><br>
+    Generated: ${date} at ${time} · Total sessions: ${sessions.length}
+  </div>
+
+  <div class="summary">
+    <h2>Summary</h2>
+    <table>
+      <thead><tr><th>#</th><th>Student</th><th>Level</th><th>Time</th><th>Difficult Sounds</th></tr></thead>
+      <tbody>
+        ${sessions.map((s, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${s.name}</td>
+            <td>${s.level}</td>
+            <td>${s.timestamp}</td>
+            <td>${s.difficultSounds || "—"}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  </div>
+
+  ${sessionHTML}
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `speaking-session-report-${date.replace(/\//g, "-")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   return null;
