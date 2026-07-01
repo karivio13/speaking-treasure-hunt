@@ -17,6 +17,14 @@ const TASKS = {
         "I'm going to describe a situation. I'd like you to tell me what you would do.",
       examinerPrompt: `You are a Cambridge A2 Key speaking examiner. Present this situation: "Your friend is visiting your city for the first time this weekend. They ask you: 'What three things should I do or see?' Tell me your recommendations and why." Ask one follow-up question after their first response. After 2 student turns total, write [DONE] on its own line.`,
     },
+    {
+      title: "Part 3 · Photograph Description",
+      intro:
+        "Now I'd like you to look at this photograph and tell me what you can see.",
+      imageUrl: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=700&q=80",
+      imageAlt: "People working together around a table in a bright office",
+      examinerPrompt: `You are a Cambridge A2 Key speaking examiner. The student is looking at a photograph of people working together around a table in a bright, modern office. There are laptops, papers, and coffee cups on the table. Some people are smiling and pointing at a screen. Ask the student to describe what they can see — the people, the place, the objects, what is happening. Encourage them with simple follow-up questions like "What are the people doing?" or "How do they look?" if they get stuck. After 2 student turns, write [DONE] on its own line.`,
+    },
   ],
   B1: [
     {
@@ -30,6 +38,14 @@ const TASKS = {
       intro:
         "Now we're going to discuss a situation together and try to reach a decision.",
       examinerPrompt: `You are a Cambridge B1 Preliminary speaking examiner doing a collaborative task. Present this situation: "A student is choosing between two options for improving their English: (A) joining a weekly conversation club with other students, or (B) using an AI app to practise alone every day. Discuss both options with the student and try to agree on which is better." Engage genuinely — disagree if appropriate, ask for reasons. After 3 student turns, write [DONE] on its own line.`,
+    },
+    {
+      title: "Part 3 · Photograph Description",
+      intro:
+        "I'd like you to look at this photograph. Please describe what you can see and say what you think the people are feeling.",
+      imageUrl: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=700&q=80",
+      imageAlt: "Group of young people laughing and talking outdoors",
+      examinerPrompt: `You are a Cambridge B1 Preliminary speaking examiner. The student is looking at a photograph of a group of young people laughing and talking together outdoors in what appears to be a park or campus area. They look relaxed and happy. Ask the student to describe what they see and speculate about the situation — who these people might be, what they could be talking about, how they are feeling and why. After their description, ask one follow-up: "Have you ever been in a similar situation? Tell me about it." After 3 student turns, write [DONE] on its own line.`,
     },
   ],
   "B2+": [
@@ -45,6 +61,16 @@ const TASKS = {
         "Now I'd like you to discuss something with me and reach a decision together.",
       examinerPrompt: `You are a Cambridge B2 First speaking examiner. Present this scenario: "A university wants to improve student wellbeing. They can invest in ONE of the following: (1) a student counselling service, (2) more sports facilities, (3) a quiet study space open 24 hours, (4) free healthy food at the canteen, (5) a language exchange programme. Discuss the options with the student and agree on the MOST important one." Push back on their choices, ask for justification, suggest alternatives. After 3 student turns, write [DONE] on its own line.`,
     },
+    {
+      title: "Part 4 · Photograph Comparison",
+      intro:
+        "I'd like you to compare these two photographs, say what the people might be thinking or feeling, and discuss which situation you think is more challenging.",
+      imageUrl: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=700&q=80",
+      imageAlt: "Teacher presenting to a classroom of students",
+      imageUrl2: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=700&q=80",
+      imageAlt2: "Person studying alone at a desk with books",
+      examinerPrompt: `You are a Cambridge B2 First speaking examiner. The student is comparing two photographs: Photo 1 shows a teacher presenting to a classroom of engaged students. Photo 2 shows a person studying alone at a desk surrounded by books and notes, looking concentrated but perhaps tired. Ask the student to: (1) compare what is happening in each photo, (2) speculate about what the people might be thinking or feeling, and (3) say which situation they think requires more effort and why. After their long turn, ask ONE probing follow-up. After 2 student turns, write [DONE] on its own line.`,
+    },
   ],
   C1: [
     {
@@ -58,6 +84,14 @@ const TASKS = {
       intro:
         "Now I'd like to discuss a broader topic with you.",
       examinerPrompt: `You are a Cambridge C1 Advanced speaking examiner. Discuss this question with the student: "To what extent does the education system prepare young people for the realities of adult life?" Engage as an intellectual interlocutor — challenge generalisations, ask for evidence, offer counterarguments. Expect precise vocabulary, hedging, and nuanced argument. After 3 substantial student turns, write [DONE] on its own line.`,
+    },
+    {
+      title: "Part 4 · Visual Prompt — Thematic Discussion",
+      intro:
+        "I'd like you to look at this image and use it as a starting point for a discussion.",
+      imageUrl: "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=700&q=80",
+      imageAlt: "Child raising hand in a colourful, diverse classroom",
+      examinerPrompt: `You are a Cambridge C1 Advanced speaking examiner. The student is looking at a photograph of a young child confidently raising their hand in a bright, diverse, and colourful primary school classroom. There are drawings and letters on the walls, and other children sit around them. Ask the student to use this image as a springboard to discuss broader themes — e.g. the role of confidence in learning, what makes an ideal learning environment, equity in education, or what is lost and gained as formal education progresses from childhood to adulthood. Push back on generalisations, demand evidence or examples, and introduce counterarguments. After 3 substantial turns, write [DONE] on its own line.`,
     },
   ],
 };
@@ -677,6 +711,40 @@ Keep the entire feedback under 200 words. Be warm, specific, and actionable.`;
           >
             {task?.intro}
           </div>
+
+          {/* Image display for photo tasks */}
+          {task?.imageUrl && (
+            <div style={{ marginBottom: "12px" }}>
+              <img
+                src={task.imageUrl}
+                alt={task.imageAlt}
+                style={{
+                  width: "100%",
+                  borderRadius: "12px",
+                  maxHeight: "200px",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+              {task.imageUrl2 && (
+                <img
+                  src={task.imageUrl2}
+                  alt={task.imageAlt2}
+                  style={{
+                    width: "100%",
+                    borderRadius: "12px",
+                    maxHeight: "200px",
+                    objectFit: "cover",
+                    display: "block",
+                    marginTop: "8px",
+                  }}
+                />
+              )}
+              <div style={{ fontSize: "11px", color: "#aaa", textAlign: "center", marginTop: "4px" }}>
+                📷 Describe what you see in this photograph
+              </div>
+            </div>
+          )}
 
           {/* Chat area */}
           <div style={s.chatArea}>
